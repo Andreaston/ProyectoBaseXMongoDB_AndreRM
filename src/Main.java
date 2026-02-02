@@ -16,8 +16,8 @@ public class Main {
         int opcion = 0;
 
         do {
-            System.out.println("1. Modificar valor XML por ID\n2. Eliminar producto\n3. Obtener todos los productos por orden alfabético\n4. Listar productos por disponibilidad\n5. Mostrar producto más caro de X categoría" +
-                    "\n6. Mostrar nombre de productos con subcanedas\n7. Mostrar cantidad total de productos en cada categoría y calcular el porcentaje que representa del stock\n6. SALIR");
+            System.out.println("1. Modificar valor XML por ID\n2. Eliminar producto\n3. Obtener todos los productos por orden alfabético\n4. Listar productos por disponibilidad\n5. Mostrar producto más caro por categoría" +
+                    "\n6. Mostrar nombre y fabricante de productos con subcanedas a buscar\n7. Mostrar cantidad total de productos en cada categoría y calcular el porcentaje que representa del stock\n6. SALIR");
 
                 opcion = leer.nextInt();
 
@@ -119,15 +119,57 @@ public class Main {
 
                         break;
                     case 5:
+
+                        //for $cat in distinct-values(//producto/categoria) let $productosCat := //producto[categoria = $cat] let $maxPrecio := max($productosCat/precio) return $productosCat[precio = $maxPrecio]/(nombre | precio | categoria)
+
+                        BaseXClient.Query queryCaro = sesion.query("for $cat in distinct-values(//producto/categoria) let $productosCat := //producto[categoria = $cat] let $maxPrecio := max($productosCat/precio) return $productosCat[precio = $maxPrecio]/(nombre | precio | categoria)");
+
+                        while (queryCaro.more()){
+                            System.out.println(queryCaro.next());
+                        }
+
                         break;
                     case 6:
+
+                        // /productos/producto[contains(descripcion,"Impresora")]/(nombre | fabricante)
+
+                        leer.nextLine();
+                        System.out.println("Dime una subcadena a buscar");
+                        String subcadena = leer.nextLine();
+
+                        String querySub = "declare variable $sub external; /productos/producto[contains(descripcion, $sub)]/(nombre | fabricante)";
+
+                        var queryBusSub = sesion.query(querySub);
+                        queryBusSub.bind("sub",subcadena);
+
+                        if (queryBusSub == null){
+                            System.out.println("No se encontró la palabra ["+subcadena+"]");
+                        }else {
+
+                            while (queryBusSub.more()){
+                                System.out.println(queryBusSub.next());
+                            }
+
+                        }
+
+
                         break;
                     case 7:
+
+                        //for $p in distinct-values(//producto/categoria) let $lista := //producto[categoria = $p] let $suma := sum($lista/disponibilidad) let $sumaT := sum(//producto/disponibilidad)let $porce := ($suma div $sumaT) * 100 return <categoria> <nombre>{$p}</nombre> <stock>{$suma}</stock> <media>{$porce}</media> </categoria>
+
+                        BaseXClient.Query media = sesion.query("for $p in distinct-values(//producto/categoria) let $lista := //producto[categoria = $p] let $suma := sum($lista/disponibilidad) let $sumaT := sum(//producto/disponibilidad)let $porce := ($suma div $sumaT) * 100 return <categoria> <nombre>{$p}</nombre> <stock>{$suma}</stock> <media>{$porce}</media></categoria>");
+
+                        while (media.more()){
+                            System.out.println(media.next());
+                        }
+
+
                         break;
                 }
 
 
-        }while (opcion != 6);
+        }while (opcion != 8);
 
     }
 }
