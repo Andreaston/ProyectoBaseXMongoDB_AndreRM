@@ -1,23 +1,46 @@
+
+
+import com.mongodb.client.*;
 import org.basex.examples.api.BaseXClient;
+import org.bson.Document;
+import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Scanner;
 
 // Press Shift twice to open the Search Everywhere dialog and type `show whitespaces`,
 // then press Enter. You can now see whitespace characters in your code.
 public class Main {
     public static void main(String[] args) throws IOException {
-        //BaseXClient session = new BaseXClient("localhost", 1984, "admin", "123abc")
-        BaseXClient sesion = new BaseXClient("localhost",1984,"admin","123abc");
 
-        sesion.execute("OPEN productos");
+        //Abrir BaseX
+        //BaseXClient session = new BaseXClient("localhost", 1984, "admin", "123abc")
+        BaseXClient sesionBase = new BaseXClient("localhost",1984,"admin","123abc");
+
+        sesionBase.execute("OPEN productos");
+
+        //Abrir MongoDB
+
+        String url = "mongodb://localhost:27017";
+        MongoClient mongoClient = MongoClients.create(url);
+        MongoDatabase databaseMon = mongoClient.getDatabase("tienda");
+
 
         Scanner leer = new Scanner(System.in);
         int opcion = 0;
 
+        //Guardar id cliente seleccionado
+        ObjectId clienteId = null;
+        //String clienteId = null;
+
         do {
             System.out.println("1. Modificar valor XML por ID\n2. Eliminar producto\n3. Obtener todos los productos por orden alfabético\n4. Listar productos por disponibilidad\n5. Mostrar producto más caro por categoría" +
-                    "\n6. Mostrar nombre y fabricante de productos con subcanedas a buscar\n7. Mostrar cantidad total de productos en cada categoría y calcular el porcentaje que representa del stock\n6. SALIR");
+                    "\n6. Mostrar nombre y fabricante de productos con subcanedas a buscar\n7. Mostrar cantidad total de productos en cada categoría y calcular el porcentaje que representa del stock" +
+                    "\n8. Crear un nuevo cliente \n9. Identificarse con cliente \n10. Borrar cliente \n11. Modificar valor de cliente \n12. Introducir producto al carrito \n13. Mostrar carrito del cliente" +
+                    "\n14. Mostrar pedidos \n15. Pagar carrito \n16. Sumar todos los pedidos \n17. Suma de los pedidos de cada cliente \n18. SALIR");
 
                 opcion = leer.nextInt();
 
@@ -36,7 +59,7 @@ public class Main {
                                 "declare variable $precio external;" +
                                 "replace node /productos/producto[id = $id]/precio with <precio>{$precio}</precio>";
 
-                        var sentencia = sesion.query(query);
+                        var sentencia = sesionBase.query(query);
 
                         sentencia.bind("id", id);
                         sentencia.bind("precio",precio);
@@ -55,7 +78,7 @@ public class Main {
 
                         String eliminar = "declare variable $id external; delete node /productos/producto[id = $id]";
 
-                        var queryDelete = sesion.query(eliminar);
+                        var queryDelete = sesionBase.query(eliminar);
 
                         queryDelete.bind("id", idDelete);
 
@@ -68,7 +91,7 @@ public class Main {
 
                         //for $p in //producto order by $p/nombre return $p/(id | nombre | precio | disponibilidad | categoria )
 
-                        BaseXClient.Query productosOrden = sesion.query("for $p in //producto order by $p/nombre return $p/(id | nombre | precio | disponibilidad | categoria )");
+                        BaseXClient.Query productosOrden = sesionBase.query("for $p in //producto order by $p/nombre return $p/(id | nombre | precio | disponibilidad | categoria )");
 
                         while (productosOrden.more()){
                             System.out.println(productosOrden.next());
@@ -87,7 +110,7 @@ public class Main {
                                 "//producto[disponibilidad > $cantidad]/(id | nombre | precio | disponibilidad | categoria )";
 
 
-                        var queryBuscar = sesion.query(buscar);
+                        var queryBuscar = sesionBase.query(buscar);
 
                         queryBuscar.bind("cantidad", n);
 
@@ -107,7 +130,7 @@ public class Main {
                         String buscar = "declare variable $cantidad external;" +
                                 "for $p in //producto let $disponibilidad := xs:integer(normalize-space($p/disponibilidad)) where xs:integer($cantidad) > $disponibilidad return $p/(id | nombre | precio | disponibilidad | categoria)";
 
-                        var queryBuscar = sesion.query(buscar);
+                        var queryBuscar = sesionBase.query(buscar);
 
                         queryBuscar.bind("cantidad", n);
 
@@ -122,7 +145,7 @@ public class Main {
 
                         //for $cat in distinct-values(//producto/categoria) let $productosCat := //producto[categoria = $cat] let $maxPrecio := max($productosCat/precio) return $productosCat[precio = $maxPrecio]/(nombre | precio | categoria)
 
-                        BaseXClient.Query queryCaro = sesion.query("for $cat in distinct-values(//producto/categoria) let $productosCat := //producto[categoria = $cat] let $maxPrecio := max($productosCat/precio) return $productosCat[precio = $maxPrecio]/(nombre | precio | categoria)");
+                        BaseXClient.Query queryCaro = sesionBase.query("for $cat in distinct-values(//producto/categoria) let $productosCat := //producto[categoria = $cat] let $maxPrecio := max($productosCat/precio) return $productosCat[precio = $maxPrecio]/(nombre | precio | categoria)");
 
                         while (queryCaro.more()){
                             System.out.println(queryCaro.next());
@@ -139,7 +162,7 @@ public class Main {
 
                         String querySub = "declare variable $sub external; /productos/producto[contains(descripcion, $sub)]/(nombre | fabricante)";
 
-                        var queryBusSub = sesion.query(querySub);
+                        var queryBusSub = sesionBase.query(querySub);
                         queryBusSub.bind("sub",subcadena);
 
                         if (queryBusSub == null){
@@ -158,7 +181,7 @@ public class Main {
 
                         //for $p in distinct-values(//producto/categoria) let $lista := //producto[categoria = $p] let $suma := sum($lista/disponibilidad) let $sumaT := sum(//producto/disponibilidad)let $porce := ($suma div $sumaT) * 100 return <categoria> <nombre>{$p}</nombre> <stock>{$suma}</stock> <media>{$porce}</media> </categoria>
 
-                        BaseXClient.Query media = sesion.query("for $p in distinct-values(//producto/categoria) let $lista := //producto[categoria = $p] let $suma := sum($lista/disponibilidad) let $sumaT := sum(//producto/disponibilidad)let $porce := ($suma div $sumaT) * 100 return <categoria> <nombre>{$p}</nombre> <stock>{$suma}</stock> <media>{$porce}</media></categoria>");
+                        BaseXClient.Query media = sesionBase.query("for $p in distinct-values(//producto/categoria) let $lista := //producto[categoria = $p] let $suma := sum($lista/disponibilidad) let $sumaT := sum(//producto/disponibilidad)let $porce := ($suma div $sumaT) * 100 return <categoria> <nombre>{$p}</nombre> <stock>{$suma}</stock> <media>{$porce}</media></categoria>");
 
                         while (media.more()){
                             System.out.println(media.next());
@@ -166,10 +189,100 @@ public class Main {
 
 
                         break;
+                    case 8:
+                        leer.nextLine();
+                        System.out.println("Dime el nombre del nuevo cliente");
+                        String nombre = leer.nextLine();
+                        System.out.println("Dime el correo de " + nombre);
+                        String email = leer.nextLine();
+                        System.out.println("Dime la direccion de " + nombre);
+                        String direccion = leer.nextLine();
+
+                        MongoCollection<Document> cliente = databaseMon.getCollection("pedidos");
+                        //new Document("email", "carlos.martinez@example.com")
+                        Document clienteMail = cliente.find(new Document("email",email)).first();
+
+                        if (clienteMail != null){
+                            System.out.println("Ese mail ya está registrado con otro usuario");
+                        }else {
+                            Document crearCliente = new Document("nombre", nombre).append("email", email).append("direccion",direccion);
+                            cliente.insertOne(crearCliente);
+                            System.out.println("Cliente creado correctamente");
+                        }
+
+                        break;
+                    case 9:
+
+                        leer.nextLine();
+                        System.out.println("Dime el email de cliente registrado para entrar en la sesión");
+                        String emailCliente = leer.nextLine();
+
+                        MongoCollection<Document> pedidos = databaseMon.getCollection("pedidos");
+                        Document clienteExist = pedidos.find(new Document("email",emailCliente)).first();
+
+                        if (clienteExist == null){
+                            System.out.println("El cliente no existe");
+                        } else {
+                            //List<Bson> pillarId = Arrays.asList(new Document("$match",new Document("email", new Document("$eq", clienteExist))), new Document("$project", new Document("_id", 1L)));
+                            //clienteId = (String) pillarId;
+                            clienteId = clienteExist.getObjectId("_id");
+                            System.out.println("Registro completado");
+                        }
+
+
+                        break;
+                    case 10:
+
+                        //new Document("email", "carlos.martinez@example.com")
+                        leer.nextLine();
+                        System.out.println("Dime el email del cliente a eliminar");
+                        String clientEliminar = leer.nextLine();
+
+                        MongoCollection<Document> collection = databaseMon.getCollection("pedidos");
+                        Document ce = collection.find(new Document("email", clientEliminar)).first();
+
+                        if (ce.isEmpty()){
+                            System.out.println("El cliente no existe");
+                        } else {
+                            collection.deleteOne(ce);
+                        }
+
+                        break;
+                    case 11:
+
+                        leer.nextLine();
+                        System.out.println("Dime el nombre para actualizar");
+                        String nombreAct =leer.nextLine();
+                        System.out.println("Dime el email para actualizar");
+                        String emailAct = leer.nextLine();
+                        System.out.println("Dime la dirección para actualizar");
+                        String direcAct = leer.nextLine();
+                        //Hay que meter filtro para que avise si no estás dentro de la cuenta
+                        MongoCollection<Document> colecionActualizar = databaseMon.getCollection("pedidos");
+                        Document cambios = new Document().append("nombre", nombreAct).append("email",emailAct).append("direccion",direcAct);
+                        colecionActualizar.updateOne(new Document("_id",clienteId), new Document("$set",cambios));
+
+                        break;
+                    case 12:
+                        break;
+                    case 13:
+                        break;
+                    case 14:
+                        break;
+                    case 15:
+                        break;
+                    case 16:
+                        break;
+                    case 17:
+                        break;
+                    case 18:System.out.println("Chao :)");
+                        break;
+                    default: System.out.println("No entendí ["+opcion+"]");
+                        break;
                 }
 
 
-        }while (opcion != 8);
+        }while (opcion != 18);
 
     }
 }
