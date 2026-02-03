@@ -7,6 +7,7 @@ import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Scanner;
@@ -258,14 +259,104 @@ public class Main {
                         System.out.println("Dime la dirección para actualizar");
                         String direcAct = leer.nextLine();
                         //Hay que meter filtro para que avise si no estás dentro de la cuenta
-                        MongoCollection<Document> colecionActualizar = databaseMon.getCollection("pedidos");
-                        Document cambios = new Document().append("nombre", nombreAct).append("email",emailAct).append("direccion",direcAct);
-                        colecionActualizar.updateOne(new Document("_id",clienteId), new Document("$set",cambios));
+
+                        if (clienteId == null){
+                            System.out.println("No hay usuario registrado");
+                        } else {
+                            MongoCollection<Document> colecionActualizar = databaseMon.getCollection("pedidos");
+                            Document cambios = new Document().append("nombre", nombreAct).append("email",emailAct).append("direccion",direcAct);
+                            colecionActualizar.updateOne(new Document("_id",clienteId), new Document("$set",cambios));
+                            System.out.println("Actualización del cliente satisfactoria");
+                        }
 
                         break;
                     case 12:
+                        // string-join(//producto[id = 3]/(nombre/text() | disponibilidad/text()| precio/text()), ',')
+                        // //producto[nombre = "Laptop HP Pavilion"]/disponibilidad/text()
+                        String confirmacion = null;
+                        //Comproebo que el cliente esté registrado
+                        if (clienteId == null){
+                            System.out.println("Primero entra como usuario");
+                        } else {
+
+                            do {
+                                //Pido info del producto
+                                System.out.println("Introduce el ID del producto");
+                                String idProducto = leer.nextLine();
+                                leer.nextLine(); //Si no lo pongo la primera vez que entra en el bucle salta la siguiente sentencia, si lo pongo al repetir el bucle pide introducir algo
+                                System.out.println("Introduce la cantidad");
+                                int cantidad = leer.nextInt();
+
+                                //Traer el producto con una query, despúes lo separo en diferentes partes para guardar en varaibles
+                                String queryCarrito = "declare variable $id external; string-join(//producto[id = $id]/(nombre/text() | disponibilidad/text()| precio/text()), ',') ";
+                                //String queryCarrito = "declare variable $id external; string-join((//producto[id = $id]/nombre/text(),//producto[id = $id]/precio/text(),//producto[id = $id]/disponibilidad/text()), ',')";
+                                var productoCarrito = sesionBase.query(queryCarrito);
+                                productoCarrito.bind("id",idProducto);
+                                productoCarrito.execute();
+
+                                String producto = "";
+
+                                while (productoCarrito.more()){
+                                    producto = productoCarrito.next();
+                                    System.out.println(producto);
+                                }
+
+                                System.out.println("PRODUCTO RAW -> [" + producto + "]");
+                                System.out.println("LONGITUD -> " + producto.length());
+
+                                String[] partes = producto.split(",");
+                                System.out.println("PARTES -> " + partes.length);
+
+                                String nomProd = partes[0];
+                                double precioPod = Double.parseDouble(partes[1]);
+                                //String precioPod = partes[1];
+                                int stock = Integer.parseInt(partes[2]);
+                                /*
+                                //Comprobar que hay suficiente cantidad
+
+                                String cantidadProd = "declare variable $id external; //producto[id = id]/disponibilidad/text()";
+
+                                var cantidadProducto = sesionBase.query(cantidadProd);
+                                int c = Integer.parseInt(String.valueOf(cantidadProducto));
+
+                                 */
+
+                                if (cantidad > stock){
+                                    System.out.println("No hay sufuente stock");
+                                    break;
+                                }else {
+                                    //Ahora actualizo el carrito del cliente
+                                    MongoCollection<Document> pedido = databaseMon.getCollection("pedidos");
+                                    Document pedidoNuevo = new Document().append("producto_id",idProducto).append("nombre", nomProd).append("cantidad", stock).append("precio_unitario", precioPod);
+                                    pedido.updateOne(new Document("_id",clienteId), new Document("$push", new Document("carrito",pedidoNuevo)));
+                                    System.out.println("Introducido producto ["+idProducto+"] en el carrito");
+                                }
+
+
+
+                                leer.nextLine();
+                                System.out.println("¿Desea introducir más productos?(s/n)");
+                                confirmacion = leer.nextLine();
+                            }while (confirmacion.equals("s"));
+
+                        }
+
                         break;
                     case 13:
+                        /*
+                          Arrays.asList(new Document("$unwind",
+    new Document("path", "$carrito")),
+    new Document("$match",
+    new Document("_id",
+    new ObjectId("65f000000000000000000001"))),
+    new Document("$project",
+    new Document("id_producto", "$carrito.producto_id")
+            .append("producto", "$carrito.nombre")
+            .append("cantidad", "$carrito.cantidad")
+            .append("precio_unitario", "$carrito.precio_unitario")),
+    new Document("$count", "Productos en Carrito"))
+                         */
+
                         break;
                     case 14:
                         break;
