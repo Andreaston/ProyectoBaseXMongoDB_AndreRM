@@ -2,6 +2,7 @@
 
 import com.mongodb.client.*;
 import org.basex.examples.api.BaseXClient;
+import org.bson.BsonNull;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -357,8 +358,87 @@ public class Main {
     new Document("$count", "Productos en Carrito"))
                          */
 
+                        /*
+                        * Arrays.asList(new Document("$unwind",
+    new Document("path", "$carrito")
+            .append("includeArrayIndex", "string")),
+    new Document("$match",
+    new Document("_id",
+    new ObjectId("65f000000000000000000001"))),
+    new Document("$project",
+    new Document("producto_id", "$carrito.producto_id")
+            .append("producto", "$carrito.nombre")
+            .append("cantidad", "$carrito.cantidad")
+            .append("precio", "$carrito.precio_unitario")),
+    new Document("$group",
+    new Document("_id",
+    new BsonNull())
+            .append("cantidad",
+    new Document("$sum", "$cantidad"))))
+                        * */
+
+                        if (clienteId == null){
+                            System.out.println("Es necesario registrarse primero como usuario (Op.9)");
+                        } else {
+                            List<Bson> carritousuario = Arrays.asList(new Document("$unwind",
+                                            new Document("path", "$carrito")
+                                                    .append("includeArrayIndex", "string")),
+                                    new Document("$match",
+                                            new Document("_id",clienteId)),
+                                    new Document("$project",
+                                            new Document("producto_id", "$carrito.producto_id")
+                                                    .append("producto", "$carrito.nombre")
+                                                    .append("cantidad", "$carrito.cantidad")
+                                                    .append("precio", "$carrito.precio_unitario"))) ;
+
+                            MongoCollection<Document> colec = databaseMon.getCollection("pedidos");
+
+                            AggregateIterable<Document> resultado = colec.aggregate(carritousuario);
+
+                            for (Document doc: resultado ) {
+                                System.out.println(doc.toJson());
+                            }
+                        }
+
                         break;
                     case 14:
+
+                        /*
+                        * Arrays.asList(new Document("$unwind",
+    new Document("path", "$pedidos")
+            .append("includeArrayIndex", "string")),
+    new Document("$match",
+    new Document("_id",
+    new ObjectId("65f000000000000000000003"))),
+    new Document("$project",
+    new Document("pedido_id", "$pedidos.pedido_id")
+            .append("fecha", "$pedidos.fecha_pedido")
+            .append("producto", "$pedidos.productos.nombre")
+            .append("precio", "$pedidos.productos.precio_unitario")))
+                        * */
+
+                        if (clienteId == null){
+                            System.out.println("Conectate como usuario (Op.9)");
+                        }else {
+                            List<Document> pedidosLista = Arrays.asList(new Document("$unwind",
+                                            new Document("path", "$pedidos")
+                                                    .append("includeArrayIndex", "string")),
+                                    new Document("$match",
+                                            new Document("_id",clienteId)),
+                                    new Document("$project",
+                                            new Document("pedido_id", "$pedidos.pedido_id")
+                                                    .append("fecha", "$pedidos.fecha_pedido")
+                                                    .append("producto", "$pedidos.productos.nombre")
+                                                    .append("precio", "$pedidos.productos.precio_unitario")));
+
+                            MongoCollection<Document> cole = databaseMon.getCollection("pedidos");
+                            AggregateIterable<Document> agregacion = cole.aggregate(pedidosLista);
+                            for (Document doc : agregacion){
+                                System.out.println(doc.toJson());
+                            }
+                        }
+
+
                         break;
                     case 15:
                         break;
