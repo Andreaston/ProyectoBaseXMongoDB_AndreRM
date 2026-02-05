@@ -9,9 +9,7 @@ import org.bson.types.ObjectId;
 
 import java.io.IOException;
 import java.lang.reflect.Array;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Scanner;
+import java.util.*;
 
 // Press Shift twice to open the Search Everywhere dialog and type `show whitespaces`,
 // then press Enter. You can now see whitespace characters in your code.
@@ -42,7 +40,7 @@ public class Main {
             System.out.println("1. Modificar valor XML por ID\n2. Eliminar producto\n3. Obtener todos los productos por orden alfabético\n4. Listar productos por disponibilidad\n5. Mostrar producto más caro por categoría" +
                     "\n6. Mostrar nombre y fabricante de productos con subcanedas a buscar\n7. Mostrar cantidad total de productos en cada categoría y calcular el porcentaje que representa del stock" +
                     "\n8. Crear un nuevo cliente \n9. Identificarse con cliente \n10. Borrar cliente \n11. Modificar valor de cliente \n12. Introducir producto al carrito \n13. Mostrar carrito del cliente" +
-                    "\n14. Mostrar pedidos \n15. Pagar carrito \n16. Sumar todos los pedidos \n17. Suma de los pedidos de cada cliente \n18. SALIR");
+                    "\n14. Mostrar pedidos cliente \n15. Realizar pedido del carrito \n16. Sumar todos los carritos de cada cliente \n17. Suma de los pedidos de cada cliente \n18. SALIR");
 
                 opcion = leer.nextInt();
 
@@ -441,10 +439,120 @@ public class Main {
 
                         break;
                     case 15:
+
+                        /*
+                        * Arrays.asList(new Document("$unwind",
+    new Document("path", "$carrito")
+            .append("includeArrayIndex", "string")),
+    new Document("$match",
+    new Document("_id",
+    new ObjectId("65f000000000000000000001"))),
+    new Document("$project",
+    new Document("idProducto", "$carrito.producto_id")
+            .append("nombre", "$carrito.nombre")
+            .append("cantidad", "$carrito.cantidad")
+            .append("precio", "$carrito.precio_unitario")))
+                        * */
+
+                        if (clienteId == null){
+                            System.out.println("Registrate antes de realizar el pedido (Op.9)");
+                        }else {
+                            List<Document> carritoPedidos =  Arrays.asList(new Document("$unwind",
+                                            new Document("path", "$carrito")
+                                                    .append("includeArrayIndex", "string")),
+                                    new Document("$match",
+                                            new Document("_id",clienteId)),
+                                    new Document("$project",
+                                            new Document("idProducto", "$carrito.producto_id")
+                                                    .append("nombre", "$carrito.nombre")
+                                                    .append("cantidad", "$carrito.cantidad")
+                                                    .append("precio", "$carrito.precio_unitario")
+                                    )
+                            );
+
+                            MongoCollection<Document> coleccionPedidos = databaseMon.getCollection("pedidos");
+
+                            List<Document> arrayCarrito = new ArrayList<>();
+
+                            for (Document document : coleccionPedidos.aggregate(carritoPedidos)){
+                                arrayCarrito.add(document);
+                            }
+
+                            int totalPedido = 0;
+
+                            for (Document docPe : arrayCarrito){
+                                int cantidad = docPe.getInteger("cantidad");
+                                double precioP = docPe.getDouble("precio");
+                                totalPedido = (int) (cantidad * precioP);
+                            }
+
+                            Document nuevoPedido = new Document("pedido_id",new ObjectId()).append("productos", arrayCarrito).append("total", totalPedido).append("fecha_pedido", new Date());
+
+                            coleccionPedidos.updateOne(new Document("_id",clienteId), new Document("$push",new Document("pedidos",nuevoPedido)));
+                        }
+
                         break;
                     case 16:
+
+                         /*
+                        * Arrays.asList(new Document("$unwind",
+    new Document("path", "$carrito")
+            .append("includeArrayIndex", "string")),
+    new Document("$group",
+    new Document("_id", "$email")
+            .append("sumaCarrito",
+    new Document("$sum", "$carrito.precio_unitario"))),
+    new Document("$sort",
+    new Document("orden", 1L)))
+                        * */
+
+                        List<Document> ordenCarritos = Arrays.asList(new Document("$unwind",
+                                        new Document("path", "$carrito")
+                                                .append("includeArrayIndex", "string")),
+                                new Document("$group",
+                                        new Document("_id", "$email")
+                                                .append("sumaCarrito",
+                                                        new Document("$sum", "$carrito.precio_unitario"))),
+                                new Document("$sort",
+                                        new Document("orden", 1L)
+                                )
+                        );
+
+                        MongoCollection<Document> col = databaseMon.getCollection("pedidos");
+                        AggregateIterable<Document> agregacionCarrito = col.aggregate(ordenCarritos);
+                        for (Document document : agregacionCarrito){
+                            System.out.println(document.toJson());
+                        }
+
                         break;
                     case 17:
+
+                        /*
+                        * Arrays.asList(new Document("$unwind",
+    new Document("path", "$pedidos")
+            .append("includeArrayIndex", "string")),
+    new Document("$group",
+    new Document("_id", "$email")
+            .append("sumaPedidos",
+    new Document("$sum", "$pedidos.total"))))
+                        * */
+
+                        List<Document> listaPedidos = Arrays.asList(new Document("$unwind",
+                                        new Document("path", "$pedidos")
+                                                .append("includeArrayIndex", "string")),
+                                new Document("$group",
+                                        new Document("_id", "$email")
+                                                .append("sumaPedidos",
+                                                        new Document("$sum", "$pedidos.total"))
+                                )
+                        );
+
+                        MongoCollection<Document> colPed = databaseMon.getCollection("pedidos");
+                        AggregateIterable<Document> agrePed = colPed.aggregate(listaPedidos);
+                        for (Document document : agrePed){
+                            System.out.println(document.toJson());
+                        }
+
                         break;
                     case 18:System.out.println("Chao :)");
                         break;
